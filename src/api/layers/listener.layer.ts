@@ -1,17 +1,18 @@
-import { EventEmitter } from 'events';
-import { Page, Browser } from 'puppeteer';
-import { CreateConfig } from '../../config/create-config';
-import { ExposedFn } from '../helpers/exposed.enum';
 import {
   Ack,
   Chat,
+  ChatStatus,
   LiveLocation,
   Message,
   ParticipantEvent,
-  PicTumb,
-  ChatStatus
+  PicTumb
 } from '../model';
+import { Browser, Page } from 'puppeteer';
 import { SocketState, SocketStream } from '../model/enum';
+
+import { CreateConfig } from '../../config/create-config';
+import { EventEmitter } from 'events';
+import { ExposedFn } from '../helpers/exposed.enum';
 import { InterfaceChangeMode } from '../model';
 import { InterfaceMode } from '../model/enum/interface-mode';
 import { InterfaceState } from '../model/enum/interface-state';
@@ -154,13 +155,13 @@ export class ListenerLayer extends ProfileLayer {
    * @fires Message
    */
   public async onAnyMessage(fn: (message: Message) => void) {
-    this.listenerEmitter.on(ExposedFn.OnAnyMessage, (msg) => {
+    this.listenerEmitter.on(ExposedFn.onAnyMessage, (msg) => {
       fn(msg);
     });
 
     return {
       dispose: () => {
-        this.listenerEmitter.off(ExposedFn.OnAnyMessage, (msg) => {
+        this.listenerEmitter.off(ExposedFn.onAnyMessage, (msg) => {
           fn(msg);
         });
       }
@@ -260,7 +261,7 @@ export class ListenerLayer extends ProfileLayer {
    * @returns Observable stream of messages
    */
   public async onMessage(fn: (message: Message) => void) {
-    this.listenerEmitter.on(ExposedFn.OnMessage, (state: Message) => {
+    this.listenerEmitter.on(ExposedFn.onMessage, (state: Message) => {
       if (!callonMessage.checkObj(state.from, state.id)) {
         callonMessage.addObjects(state.from, state.id);
         fn(state);
@@ -268,7 +269,7 @@ export class ListenerLayer extends ProfileLayer {
     });
     return {
       dispose: () => {
-        this.listenerEmitter.off(ExposedFn.OnMessage, (state: Message) => {
+        this.listenerEmitter.off(ExposedFn.onMessage, (state: Message) => {
           if (!callonMessage.checkObj(state.from, state.id)) {
             callonMessage.addObjects(state.from, state.id);
             fn(state);

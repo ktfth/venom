@@ -1,6 +1,4 @@
 export enum ExposedFn {
-  OnMessage = 'onMessage',
-  OnAnyMessage = 'onAnyMessage',
   onAck = 'onAck',
   onParticipantsChanged = 'onParticipantsChanged',
   onStateChange = 'onStateChange',
@@ -10,5 +8,7 @@ export enum ExposedFn {
   onFilePicThumb = 'onFilePicThumb',
   onChatState = 'onChatState',
   onUnreadMessage = 'onUnreadMessage',
-  onPoll = 'onPoll'
+  onPoll = 'onPoll',
+  onAnyMessage = 'onAnyMessage',
+  onMessage = 'onMessage'
 }
