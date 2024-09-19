@@ -4,6 +4,7 @@ import {
   ChatStatus,
   LiveLocation,
   Message,
+  Reaction,
   ParticipantEvent,
   PicTumb
 } from '../model';
@@ -23,6 +24,9 @@ declare global {
   interface Window {
     onMessage: any;
     onAnyMessage: any;
+    onMessageEdit: any;
+    onMessageDelete: any;
+    onMessageReaction: any;
     onStateChange: any;
     onIncomingCall: any;
     onAck: any;
@@ -76,7 +80,7 @@ export class ListenerLayer extends ProfileLayer {
       }
     }
 
-    this.addMsg();
+    await this.addMsg();
     await this.page
       .evaluate(() => {
         window.WAPI.onInterfaceChange((e: any) => {
@@ -105,6 +109,15 @@ export class ListenerLayer extends ProfileLayer {
         window.WAPI.onAck((e: any) => {
           window.onAck(e);
         });
+        window.WAPI.onMessageEdit((e: any) => {
+          window.onMessageEdit(e);
+        });
+        window.WAPI.onMessageDelete((e: any) => {
+          window.onMessageDelete(e);
+        });
+        window.WAPI.onMessageReaction((e: any) => {
+          window.onMessageReaction(e);
+        });
         window.WAPI.onPoll((e: any) => {
           window.onPoll(e);
         });
@@ -116,7 +129,8 @@ export class ListenerLayer extends ProfileLayer {
     this.page
       .evaluate(() => {
         let isHeroEqual = {};
-        // try {
+
+        // Install the new message listener (add event)
         window.Store.Msg.on('add', async (newMessage) => {
           if (!Object.is(isHeroEqual, newMessage)) {
             isHeroEqual = newMessage;
@@ -130,7 +144,38 @@ export class ListenerLayer extends ProfileLayer {
             }
           }
         });
-        // } catch { }
+
+        // Install the changed message / deleted message listener (change:body change:caption events)
+        window.Store.Msg.on(
+          'change:body change:caption',
+          async (newMessage) => {
+            if (newMessage && newMessage.isNewMsg) {
+              const processMessageObj = await window.WAPI.processMessageObj(
+                newMessage,
+                true,
+                false
+              );
+
+              // Edit or Delete?
+              if (newMessage.type == 'revoked') {
+                window.onMessageDelete(processMessageObj);
+              } else {
+                window.onMessageEdit(processMessageObj);
+              }
+            }
+          }
+        );
+
+        // Install the message reaction listener
+        // This is a strange one - seems like the way to do it is to override the WhatsApp WAWebAddonReactionTableMode.reactionTableMode.bulkUpsert function
+        const module = window.Store.Reaction.reactionTableMode;
+        const ogMethod = module.bulkUpsert;
+        module.bulkUpsert = ((...args) => {
+          if (args[0].length > 0) {
+            window.onMessageReaction(args[0][0]);
+          }
+          return ogMethod(...args);
+        }).bind(module);
       })
       .catch(() => {});
   }
@@ -151,8 +196,7 @@ export class ListenerLayer extends ProfileLayer {
 
   /**
    * @event Listens to all new messages
-   * @param to callback
-   * @fires Message
+   * @param fn
    */
   public async onAnyMessage(fn: (message: Message) => void) {
     this.listenerEmitter.on(ExposedFn.onAnyMessage, (msg) => {
@@ -163,6 +207,60 @@ export class ListenerLayer extends ProfileLayer {
       dispose: () => {
         this.listenerEmitter.off(ExposedFn.onAnyMessage, (msg) => {
           fn(msg);
+        });
+      }
+    };
+  }
+
+  /**
+   * @event Listens for edited message
+   * @param fn
+   */
+  public async onMessageEdit(fn: (message: Message) => void) {
+    this.listenerEmitter.on(ExposedFn.OnMessageEdit, (msg) => {
+      fn(msg);
+    });
+
+    return {
+      dispose: () => {
+        this.listenerEmitter.off(ExposedFn.OnMessageEdit, (msg) => {
+          fn(msg);
+        });
+      }
+    };
+  }
+
+  /**
+   * @event Listens for deleted message
+   * @param fn
+   */
+  public async onMessageDelete(fn: (message: Message) => void) {
+    this.listenerEmitter.on(ExposedFn.OnMessageDelete, (msg) => {
+      fn(msg);
+    });
+
+    return {
+      dispose: () => {
+        this.listenerEmitter.off(ExposedFn.OnMessageDelete, (msg) => {
+          fn(msg);
+        });
+      }
+    };
+  }
+
+  /**
+   * @event Listens for reactions to messages
+   * @param fn
+   */
+  public async onMessageReaction(fn: (reaction: Reaction) => void) {
+    this.listenerEmitter.on(ExposedFn.OnMessageReaction, (reaction) => {
+      fn(reaction);
+    });
+
+    return {
+      dispose: () => {
+        this.listenerEmitter.off(ExposedFn.OnMessageReaction, (reaction) => {
+          fn(reaction);
         });
       }
     };
